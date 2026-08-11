@@ -1,14 +1,17 @@
 gsap.registerPlugin(ScrollTrigger);
 
 document.addEventListener('DOMContentLoaded', () => {
-    // ─── Transparent nav at the top of the home page ─────────────────────────
+    // ─── Transparent nav at the top of the home page (desktop/tablet only) ───────────
     // #nav-bar starts transparent and .logo-mark-wrapper starts hidden; both restore
     // once the page has scrolled ~200px, and revert if scrolled back above that point.
+    // On mobile this whole effect is skipped — the nav just starts normal/visible, since
+    // starting hidden there was leaving it unreadable over whatever's behind it.
     const navBar = document.getElementById('nav-bar');
     const logoMarkWrapper = document.querySelector('.logo-mark-wrapper');
 
     if (navBar && logoMarkWrapper) {
         const SCROLL_THRESHOLD = 200;
+        const MOBILE_MAX_WIDTH = 767; // Webflow's Mobile Landscape breakpoint, cascades down to Mobile Portrait too
 
         function showNavBar() {
             gsap.to(navBar, {
@@ -30,32 +33,59 @@ document.addEventListener('DOMContentLoaded', () => {
             gsap.to(logoMarkWrapper, { opacity: 0, duration: 0.3, ease: 'cubic-bezier(0.625, 0.05, 0, 1)' });
         }
 
-        gsap.set(navBar, { backgroundColor: 'rgba(255, 253, 246, 0)', borderColor: 'transparent' });
-        gsap.set(logoMarkWrapper, { opacity: 0 });
-
         // While the nav menu overlay is open, it overrides this scroll exception entirely —
         // nav-bar/logo stay fully visible regardless of scroll position.
         let isNavMenuOpen = false;
+        let scrollTrigger;
 
-        ScrollTrigger.create({
-            start: SCROLL_THRESHOLD,
-            onEnter: () => {
-                if (!isNavMenuOpen) showNavBar();
-            },
-            onLeaveBack: () => {
-                if (!isNavMenuOpen) hideNavBar();
-            },
+        function setup() {
+            if (scrollTrigger) {
+                scrollTrigger.kill();
+                scrollTrigger = null;
+            }
+
+            if (window.innerWidth <= MOBILE_MAX_WIDTH) {
+                // Release any inline styles from a previous desktop-width pass so CSS takes back over.
+                gsap.set([navBar, logoMarkWrapper], { clearProps: 'all' });
+                return;
+            }
+
+            gsap.set(navBar, { backgroundColor: 'rgba(255, 253, 246, 0)', borderColor: 'transparent' });
+            gsap.set(logoMarkWrapper, { opacity: 0 });
+
+            scrollTrigger = ScrollTrigger.create({
+                start: SCROLL_THRESHOLD,
+                onEnter: () => {
+                    if (!isNavMenuOpen) showNavBar();
+                },
+                onLeaveBack: () => {
+                    if (!isNavMenuOpen) hideNavBar();
+                },
+            });
+        }
+
+        setup();
+
+        let resizeTimer;
+        let lastWidth = window.innerWidth;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                if (window.innerWidth === lastWidth) return;
+                lastWidth = window.innerWidth;
+                setup();
+            }, 150);
         });
 
         document.addEventListener('nav:open', () => {
             isNavMenuOpen = true;
-            showNavBar();
+            if (window.innerWidth > MOBILE_MAX_WIDTH) showNavBar();
         });
 
         document.addEventListener('nav:close', () => {
             isNavMenuOpen = false;
             // Re-sync with wherever the scroll position actually is now that the override is lifted
-            if (window.scrollY < SCROLL_THRESHOLD) {
+            if (window.innerWidth > MOBILE_MAX_WIDTH && window.scrollY < SCROLL_THRESHOLD) {
                 hideNavBar();
             }
         });
