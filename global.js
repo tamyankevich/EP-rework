@@ -249,19 +249,28 @@ document.addEventListener('DOMContentLoaded', () => {
             navMenuWrapper.classList.remove('is-open');
         });
 
-        // Odd clicks open, even clicks close
-        let clickCount = 0;
+        let isOpen = false;
+
+        function openNav() {
+            if (isOpen) return;
+            isOpen = true;
+            closeTl.pause();
+            openTl.play(0);
+        }
+
+        function closeNav() {
+            if (!isOpen) return;
+            isOpen = false;
+            openTl.pause();
+            closeTl.play(0);
+        }
 
         navButton.addEventListener('click', () => {
-            clickCount++;
+            isOpen ? closeNav() : openNav();
+        });
 
-            if (clickCount % 2 === 1) {
-                closeTl.pause();
-                openTl.play(0);
-            } else {
-                openTl.pause();
-                closeTl.play(0);
-            }
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeNav();
         });
 
         return { openTl, closeTl };
