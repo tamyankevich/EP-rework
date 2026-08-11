@@ -112,8 +112,17 @@ function initCascadingSlider() {
         const nextButton = wrapper.querySelector('[data-cascading-slider-next]');
         const slides = Array.from(viewport.querySelectorAll('[data-cascading-slide]'));
         let totalSlides = slides.length;
+        const originalSlideCount = totalSlides; // before the below pads it out to a minimum of 9 via clones
 
         if (totalSlides === 0) return;
+
+        const totalIndexEl = wrapper.querySelector('[data-slider-index-total]');
+        const currentIndexEl = wrapper.querySelector('[data-slider-index-current]');
+        const setIndexNumber = (el, value) => {
+            if (!el) return;
+            el.textContent = value < 10 ? '0' + value : String(value);
+        };
+        setIndexNumber(totalIndexEl, originalSlideCount);
 
         if (totalSlides < 9) {
             const originalSlides = slides.slice();
@@ -133,6 +142,8 @@ function initCascadingSlider() {
         let slideWidth = 0;
         let slotCenters = {};
         let slotWidths = {};
+
+        setIndexNumber(currentIndexEl, (activeIndex % originalSlideCount) + 1);
 
         function readGap() {
             const raw = getComputedStyle(viewport).getPropertyValue('--gap').trim();
@@ -285,6 +296,7 @@ function initCascadingSlider() {
             });
 
             activeIndex = normalizedTarget;
+            setIndexNumber(currentIndexEl, (activeIndex % originalSlideCount) + 1);
             layout(true, previousIndex);
             gsap.delayedCall(duration + 0.05, function () {
                 isAnimating = false;
@@ -299,6 +311,13 @@ function initCascadingSlider() {
             nextButton.addEventListener('click', function () {
                 goTo(activeIndex + 1);
             });
+
+        // Autoplay: just clicks the next button every 2s
+        if (nextButton) {
+            setInterval(function () {
+                nextButton.click();
+            }, 2000);
+        }
 
         slides.forEach(function (slide, index) {
             slide.addEventListener('click', function () {
