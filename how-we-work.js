@@ -398,4 +398,208 @@ document.addEventListener('DOMContentLoaded', () => {
     // so this just calls it directly rather than registering a second listener for an event
     // that has necessarily already fired by this point.
     initRadialCardsSlider();
+
+    // ─── Contour field background ─────────────────────────────────────────────
+    // Fine iso-contour lines through a domain-warped noise field (WebGL2), fixed full-bleed
+    // behind the page content. Values below are tuned live in prototypes/contour-field.html —
+    // tune there, then copy the settings object across rather than editing the shader by feel.
+    function initContourField() {
+        const canvas = document.createElement('canvas');
+        canvas.setAttribute('data-contour-field', '');
+        Object.assign(canvas.style, {
+            position: 'fixed',
+            inset: '0',
+            width: '100%',
+            height: '100%',
+            zIndex: '-1',
+            pointerEvents: 'none',
+        });
+        document.body.prepend(canvas);
+
+        const gl = canvas.getContext('webgl2');
+        if (!gl) return;
+
+        const settings = {
+            density: 7,
+            lineWidth: 0.6,
+            opacity: 0.14,
+            warp: 1.15,
+            scale: 1.4,
+            speed: 0.005,
+            lineColor: [100 / 255, 4 / 255, 0 / 255],
+            cream: [255 / 255, 253 / 255, 246 / 255],
+        };
+
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            settings.speed = 0;
+        }
+
+        const vertSrc = `#version 300 es
+            in vec2 aPos;
+            void main() {
+              gl_Position = vec4(aPos, 0.0, 1.0);
+            }
+        `;
+
+        // 2D simplex noise (Ashima Arts / webgl-noise, MIT).
+        const noiseGLSL = `
+            vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
+            vec2 mod289(vec2 x){return x-floor(x*(1.0/289.0))*289.0;}
+            vec3 permute(vec3 x){return mod289(((x*34.0)+1.0)*x);}
+
+            float snoise(vec2 v){
+              const vec4 C = vec4(0.211324865405187, 0.366025403784439,
+                                  -0.577350269189626, 0.024390243902439);
+              vec2 i  = floor(v + dot(v, C.yy));
+              vec2 x0 = v -   i + dot(i, C.xx);
+              vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+              vec4 x12 = x0.xyxy + C.xxzz;
+              x12.xy -= i1;
+              i = mod289(i);
+              vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0))
+                      + i.x + vec3(0.0, i1.x, 1.0));
+              vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+              m = m*m;
+              m = m*m;
+              vec3 x = 2.0 * fract(p * C.www) - 1.0;
+              vec3 h = abs(x) - 0.5;
+              vec3 ox = floor(x + 0.5);
+              vec3 a0 = x - ox;
+              m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+              vec3 g;
+              g.x  = a0.x  * x0.x  + h.x  * x0.y;
+              g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+              return 130.0 * dot(m, g);
+            }
+
+            float fbm(vec2 p) {
+              float sum = 0.0;
+              float amp = 0.5;
+              for (int i = 0; i < 2; i++) {
+                sum += amp * snoise(p);
+                p *= 2.02;
+                amp *= 0.52;
+              }
+              return sum;
+            }
+
+            float fbmWarp(vec2 p) {
+              return snoise(p);
+            }
+        `;
+
+        const fragSrc = `#version 300 es
+            precision highp float;
+            uniform vec2 uResolution;
+            uniform float uTime;
+            uniform float uDensity;
+            uniform float uLineWidth;
+            uniform float uOpacity;
+            uniform float uWarp;
+            uniform float uScale;
+            uniform vec3 uCream;
+            uniform vec3 uLineColor;
+            out vec4 fragColor;
+
+            ${noiseGLSL}
+
+            void main() {
+              vec2 uv = gl_FragCoord.xy / uResolution.xy;
+              vec2 p = (uv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0) * uScale * 3.0;
+
+              float t = uTime;
+              vec2 warp = vec2(
+                fbmWarp(p + vec2(11.3 + sin(t * 0.7) * 2.0, 4.1 + cos(t * 0.5) * 2.0)),
+                fbmWarp(p + vec2(-7.7 + cos(t * 0.6) * 2.0, 2.9 + sin(t * 0.9) * 2.0))
+              );
+
+              float h = fbm(p + warp * uWarp);
+
+              float v = h * uDensity;
+              float g = abs(v - floor(v + 0.5));
+              float aa = fwidth(v) * uLineWidth;
+              float line = 1.0 - smoothstep(0.0, aa, g);
+
+              vec3 col = mix(uCream, uLineColor, line * uOpacity);
+              fragColor = vec4(col, 1.0);
+            }
+        `;
+
+        function compile(type, src) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, src);
+            gl.compileShader(shader);
+            return shader;
+        }
+
+        const program = gl.createProgram();
+        gl.attachShader(program, compile(gl.VERTEX_SHADER, vertSrc));
+        gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragSrc));
+        gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return;
+        gl.useProgram(program);
+
+        const quad = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+        const aPos = gl.getAttribLocation(program, 'aPos');
+        gl.enableVertexAttribArray(aPos);
+        gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+        const u = {
+            resolution: gl.getUniformLocation(program, 'uResolution'),
+            time: gl.getUniformLocation(program, 'uTime'),
+            density: gl.getUniformLocation(program, 'uDensity'),
+            lineWidth: gl.getUniformLocation(program, 'uLineWidth'),
+            opacity: gl.getUniformLocation(program, 'uOpacity'),
+            warp: gl.getUniformLocation(program, 'uWarp'),
+            scale: gl.getUniformLocation(program, 'uScale'),
+            cream: gl.getUniformLocation(program, 'uCream'),
+            lineColor: gl.getUniformLocation(program, 'uLineColor'),
+        };
+
+        function resize() {
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            canvas.width = Math.floor(window.innerWidth * dpr);
+            canvas.height = Math.floor(window.innerHeight * dpr);
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        let rafId;
+        const start = performance.now();
+
+        function frame(now) {
+            const t = ((now - start) / 1000) * settings.speed;
+
+            gl.uniform2f(u.resolution, canvas.width, canvas.height);
+            gl.uniform1f(u.time, t);
+            gl.uniform1f(u.density, settings.density);
+            gl.uniform1f(u.lineWidth, settings.lineWidth);
+            gl.uniform1f(u.opacity, settings.opacity);
+            gl.uniform1f(u.warp, settings.warp);
+            gl.uniform1f(u.scale, settings.scale);
+            gl.uniform3f(u.cream, settings.cream[0], settings.cream[1], settings.cream[2]);
+            gl.uniform3f(u.lineColor, settings.lineColor[0], settings.lineColor[1], settings.lineColor[2]);
+
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+            rafId = requestAnimationFrame(frame);
+        }
+
+        // Pause the render loop while the tab is hidden — no point spending battery
+        // animating a background nobody's looking at.
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                cancelAnimationFrame(rafId);
+            } else {
+                rafId = requestAnimationFrame(frame);
+            }
+        });
+
+        rafId = requestAnimationFrame(frame);
+    }
+
+    initContourField();
 });

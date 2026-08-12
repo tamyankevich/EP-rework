@@ -303,25 +303,43 @@ function initCascadingSlider() {
             });
         }
 
+        // Autoplay: advances every 3s; any manual slide change (prev/next/direct click) resets
+        // the timer and backs off to a 5s pause before autoplay resumes at its normal cadence.
+        const AUTOPLAY_INTERVAL = 3000;
+        const AUTOPLAY_RESET_DELAY = 5000;
+        let autoplayTimer;
+
+        function scheduleAutoplay(delay) {
+            clearTimeout(autoplayTimer);
+            autoplayTimer = setTimeout(function () {
+                goTo(activeIndex + 1);
+                scheduleAutoplay(AUTOPLAY_INTERVAL);
+            }, delay);
+        }
+
+        function resetAutoplay() {
+            scheduleAutoplay(AUTOPLAY_RESET_DELAY);
+        }
+
         if (prevButton)
             prevButton.addEventListener('click', function () {
                 goTo(activeIndex - 1);
+                resetAutoplay();
             });
         if (nextButton)
             nextButton.addEventListener('click', function () {
                 goTo(activeIndex + 1);
+                resetAutoplay();
             });
 
-        // Autoplay: just clicks the next button every 2s
-        if (nextButton) {
-            setInterval(function () {
-                nextButton.click();
-            }, 2000);
-        }
+        if (nextButton) scheduleAutoplay(AUTOPLAY_INTERVAL);
 
         slides.forEach(function (slide, index) {
             slide.addEventListener('click', function () {
-                if (index !== activeIndex) goTo(index);
+                if (index !== activeIndex) {
+                    goTo(index);
+                    resetAutoplay();
+                }
             });
         });
 
