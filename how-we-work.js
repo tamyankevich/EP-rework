@@ -404,6 +404,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // behind the page content. Values below are tuned live in prototypes/contour-field.html —
     // tune there, then copy the settings object across rather than editing the shader by feel.
     function initContourField() {
+        // Capture the page's real cream before touching anything — both to feed the shader
+        // the exact same color it's compositing against, and to find which sections share it.
+        const bodyBg = getComputedStyle(document.body).backgroundColor;
+        const creamMatch = bodyBg.match(/\d+/g);
+        const creamRGB = creamMatch ? creamMatch.map(Number) : [255, 253, 246];
+
         const canvas = document.createElement('canvas');
         canvas.setAttribute('data-contour-field', '');
         Object.assign(canvas.style, {
@@ -411,13 +417,23 @@ document.addEventListener('DOMContentLoaded', () => {
             inset: '0',
             width: '100%',
             height: '100%',
-            zIndex: '-1',
+            zIndex: '0',
             pointerEvents: 'none',
         });
         document.body.prepend(canvas);
 
         const gl = canvas.getContext('webgl2');
         if (!gl) return;
+
+        // body and every section that shares the page's cream get their background stripped
+        // so the fixed canvas behind them shows through — sections with their own deliberate
+        // brand color (oxblood, footer green, etc.) keep it and simply sit on top as normal.
+        document.body.style.backgroundColor = 'transparent';
+        document.querySelectorAll('section, .section, [class*="section"], .page-wrapper').forEach((el) => {
+            if (getComputedStyle(el).backgroundColor === bodyBg) {
+                el.style.backgroundColor = 'transparent';
+            }
+        });
 
         const settings = {
             density: 7,
@@ -427,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
             scale: 1.4,
             speed: 0.005,
             lineColor: [100 / 255, 4 / 255, 0 / 255],
-            cream: [255 / 255, 253 / 255, 246 / 255],
+            cream: [creamRGB[0] / 255, creamRGB[1] / 255, creamRGB[2] / 255],
         };
 
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
