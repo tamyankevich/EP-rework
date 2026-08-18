@@ -408,17 +408,28 @@ document.addEventListener('DOMContentLoaded', () => {
     // absolute children can't otherwise size their parent) and cross-animated on a single
     // scroll-scrubbed timeline built off .section.sticky-video's scroll range.
     //
-    // SplitText's .lines aren't guaranteed to exist synchronously right after .create() — the
-    // split can defer until web fonts are ready — so targets are collected from the onSplit
-    // callback (same convention as global.js) rather than read off the return value directly.
+    // SplitText's split targets aren't guaranteed to exist synchronously right after .create()
+    // — the split can defer until web fonts are ready — so targets are collected from the
+    // onSplit callback (same convention as global.js) rather than read off the return value
+    // directly.
+    //
+    // The heading (service name) splits by character, the description splits by word — each
+    // gets its own stagger pace, matching the split-type convention in global.js's splitConfig.
     function initStickyVideoReveal() {
         const section = document.querySelector('.section.sticky-video');
         const wrapper = section ? section.querySelector('.video-features-wrapper') : null;
         const items = wrapper ? Array.from(wrapper.querySelectorAll('.video-featured-item')) : [];
         if (!section || !wrapper || !items.length) return;
 
-        const elementsByItem = items.map(item => Array.from(item.querySelectorAll('h1, h3')));
-        const linesByElement = new Map();
+        const splitSpecByItem = items.map(item => {
+            const heading = item.querySelector('h1');
+            const description = item.querySelector('h3');
+            const specs = [];
+            if (heading) specs.push({ el: heading, type: 'chars', stagger: 0.015 });
+            if (description) specs.push({ el: description, type: 'words', stagger: 0.06 });
+            return specs;
+        });
+        const splitTargetsByElement = new Map();
 
         function stackItems() {
             const tallest = Math.max(...items.map(item => item.getBoundingClientRect().height));
@@ -433,7 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         mediaQueries.add('(prefers-reduced-motion: no-preference)', () => {
             let scrollTl = null;
-            let pendingSplits = elementsByItem.reduce((sum, els) => sum + els.length, 0);
+            let pendingSplits = splitSpecByItem.reduce((sum, specs) => sum + specs.length, 0);
 
             // Crossfade width, as a fraction of one item's scroll slot — how much of the
             // outgoing/incoming items' slots overlap while they cross-animate at the boundary.
@@ -448,10 +459,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 stackItems();
 
-                const itemTargets = elementsByItem.map(els => els.flatMap(el => linesByElement.get(el) || []));
+                // Each item keeps its char (heading) and word (description) targets in separate
+                // groups — not flattened together — so each group animates at its own stagger
+                // pace while both groups still share the same entrance/exit timeline position.
+                const itemGroups = splitSpecByItem.map(specs =>
+                    specs.map(spec => ({ targets: splitTargetsByElement.get(spec.el) || [], stagger: spec.stagger }))
+                );
 
-                itemTargets.forEach((targets, index) => {
-                    gsap.set(targets, { yPercent: index === 0 ? 0 : 110, opacity: index === 0 ? 1 : 0 });
+                itemGroups.forEach((groups, index) => {
+                    groups.forEach(group => {
+                        gsap.set(group.targets, { yPercent: index === 0 ? 0 : 110, opacity: index === 0 ? 1 : 0 });
+                    });
                 });
 
                 const tl = gsap.timeline({
@@ -463,39 +481,41 @@ document.addEventListener('DOMContentLoaded', () => {
                     },
                 });
 
-                itemTargets.forEach((targets, index) => {
-                    if (!targets.length) return;
+                itemGroups.forEach((groups, index) => {
+                    groups.forEach(group => {
+                        if (!group.targets.length) return;
 
-                    // Exit: slides up and out, centered on the boundary with the next item.
-                    if (index < itemTargets.length - 1) {
-                        tl.to(targets, { yPercent: -110, opacity: 0, stagger: 0.08, ease: 'expo.in', duration: overlap }, index + 1 - overlap / 2);
-                    }
+                        // Exit: slides up and out, centered on the boundary with the next item.
+                        if (index < itemGroups.length - 1) {
+                            tl.to(group.targets, { yPercent: -110, opacity: 0, stagger: group.stagger, ease: 'expo.in', duration: overlap }, index + 1 - overlap / 2);
+                        }
 
-                    // Entrance: mirrors the previous item's exit above, at the same boundary.
-                    if (index > 0) {
-                        tl.fromTo(targets, { yPercent: 110, opacity: 0 }, { yPercent: 0, opacity: 1, stagger: 0.08, ease: 'expo.out', duration: overlap }, index - overlap / 2);
-                    }
+                        // Entrance: mirrors the previous item's exit above, at the same boundary.
+                        if (index > 0) {
+                            tl.fromTo(group.targets, { yPercent: 110, opacity: 0 }, { yPercent: 0, opacity: 1, stagger: group.stagger, ease: 'expo.out', duration: overlap }, index - overlap / 2);
+                        }
+                    });
                 });
 
                 scrollTl = tl;
                 ScrollTrigger.refresh();
             }
 
-            elementsByItem.forEach(els => {
-                els.forEach(el => {
-                    SplitText.create(el, {
-                        type: 'lines',
-                        mask: 'lines',
+            splitSpecByItem.forEach(specs => {
+                specs.forEach(spec => {
+                    SplitText.create(spec.el, {
+                        type: spec.type,
+                        mask: spec.type,
                         autoSplit: true,
                         onSplit(instance) {
-                            linesByElement.set(el, instance.lines);
+                            splitTargetsByElement.set(spec.el, instance[spec.type]);
 
                             if (pendingSplits > 0) {
                                 pendingSplits--;
                                 if (pendingSplits === 0) rebuildTimeline();
                             } else {
                                 // A resplit after the initial build (resize, font swap) — rebuild
-                                // in place so the timeline picks up the current line elements.
+                                // in place so the timeline picks up the current split targets.
                                 rebuildTimeline();
                             }
                         },
@@ -514,14 +534,14 @@ document.addEventListener('DOMContentLoaded', () => {
         mediaQueries.add('(prefers-reduced-motion: reduce)', () => {
             stackItems();
 
-            elementsByItem.forEach((els, index) => {
-                els.forEach(el => {
-                    SplitText.create(el, {
-                        type: 'lines',
-                        mask: 'lines',
+            splitSpecByItem.forEach((specs, index) => {
+                specs.forEach(spec => {
+                    SplitText.create(spec.el, {
+                        type: spec.type,
+                        mask: spec.type,
                         autoSplit: true,
                         onSplit(instance) {
-                            gsap.set(instance.lines, { yPercent: index === 0 ? 0 : -110, opacity: index === 0 ? 1 : 0 });
+                            gsap.set(instance[spec.type], { yPercent: index === 0 ? 0 : -110, opacity: index === 0 ? 1 : 0 });
                         },
                     });
                 });
