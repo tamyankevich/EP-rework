@@ -451,7 +451,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const itemTargets = elementsByItem.map(els => els.flatMap(el => linesByElement.get(el) || []));
 
                 itemTargets.forEach((targets, index) => {
-                    gsap.set(targets, { yPercent: index === 0 ? 0 : 110 });
+                    gsap.set(targets, { yPercent: index === 0 ? 0 : 110, opacity: index === 0 ? 1 : 0 });
                 });
 
                 const tl = gsap.timeline({
@@ -468,12 +468,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Exit: slides up and out, centered on the boundary with the next item.
                     if (index < itemTargets.length - 1) {
-                        tl.to(targets, { yPercent: -110, stagger: 0.08, ease: 'expo.in', duration: overlap }, index + 1 - overlap / 2);
+                        tl.to(targets, { yPercent: -110, opacity: 0, stagger: 0.08, ease: 'expo.in', duration: overlap }, index + 1 - overlap / 2);
                     }
 
                     // Entrance: mirrors the previous item's exit above, at the same boundary.
                     if (index > 0) {
-                        tl.fromTo(targets, { yPercent: 110 }, { yPercent: 0, stagger: 0.08, ease: 'expo.out', duration: overlap }, index - overlap / 2);
+                        tl.fromTo(targets, { yPercent: 110, opacity: 0 }, { yPercent: 0, opacity: 1, stagger: 0.08, ease: 'expo.out', duration: overlap }, index - overlap / 2);
                     }
                 });
 
@@ -521,7 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         mask: 'lines',
                         autoSplit: true,
                         onSplit(instance) {
-                            gsap.set(instance.lines, { yPercent: index === 0 ? 0 : -110 });
+                            gsap.set(instance.lines, { yPercent: index === 0 ? 0 : -110, opacity: index === 0 ? 1 : 0 });
                         },
                     });
                 });
