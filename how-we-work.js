@@ -446,9 +446,9 @@ document.addEventListener('DOMContentLoaded', () => {
             let scrollTl = null;
             let pendingSplits = splitSpecByItem.reduce((sum, specs) => sum + specs.length, 0);
 
-            // Crossfade width, as a fraction of one item's scroll slot — how much of the
-            // outgoing/incoming items' slots overlap while they cross-animate at the boundary.
-            const overlap = 0.4;
+            // Transition width, as a fraction of one item's scroll slot — how much of the
+            // outgoing/incoming items' slots is spent exiting/entering at each boundary.
+            const transitionDuration = 0.4;
 
             function rebuildTimeline() {
                 if (scrollTl) {
@@ -485,14 +485,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     groups.forEach(group => {
                         if (!group.targets.length) return;
 
-                        // Exit: slides up and out, centered on the boundary with the next item.
+                        // Exit: slides up and out, finishing exactly at the boundary with the
+                        // next item (not overlapping it).
                         if (index < itemGroups.length - 1) {
-                            tl.to(group.targets, { yPercent: -110, opacity: 0, stagger: group.stagger, ease: 'expo.in', duration: overlap }, index + 1 - overlap / 2);
+                            tl.to(group.targets, { yPercent: -110, opacity: 0, stagger: group.stagger, ease: 'expo.in', duration: transitionDuration }, index + 1 - transitionDuration);
                         }
 
-                        // Entrance: mirrors the previous item's exit above, at the same boundary.
+                        // Entrance: starts exactly where the previous item's exit above ends.
                         if (index > 0) {
-                            tl.fromTo(group.targets, { yPercent: 110, opacity: 0 }, { yPercent: 0, opacity: 1, stagger: group.stagger, ease: 'expo.out', duration: overlap }, index - overlap / 2);
+                            tl.fromTo(group.targets, { yPercent: 110, opacity: 0 }, { yPercent: 0, opacity: 1, stagger: group.stagger, ease: 'expo.out', duration: transitionDuration }, index);
                         }
                     });
                 });
