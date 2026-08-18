@@ -2,8 +2,8 @@ gsap.registerPlugin(ScrollTrigger);
 
 document.addEventListener('DOMContentLoaded', () => {
     // ─── Transparent nav at the top of the home page (desktop/tablet only) ───────────
-    // #nav-bar starts transparent and .logo-mark-wrapper starts hidden; both restore
-    // once the page has scrolled ~200px, and revert if scrolled back above that point.
+    // #nav-bar and .logo-mark-wrapper start fully visible on load — only going transparent
+    // if the page is scrolled down past ~200px and then back up above that point again.
     // On mobile this whole effect is skipped — the nav just starts normal/visible, since
     // starting hidden there was leaving it unreadable over whatever's behind it.
     const navBar = document.getElementById('nav-bar');
@@ -50,8 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            gsap.set(navBar, { backgroundColor: 'rgba(255, 253, 246, 0)', borderColor: 'transparent' });
-            gsap.set(logoMarkWrapper, { opacity: 0 });
+            gsap.set(navBar, { backgroundColor: 'rgba(255, 253, 246, 1)', borderColor: '#640400' });
+            gsap.set(logoMarkWrapper, { opacity: 1 });
 
             scrollTrigger = ScrollTrigger.create({
                 start: SCROLL_THRESHOLD,
