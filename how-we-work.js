@@ -401,53 +401,131 @@ document.addEventListener('DOMContentLoaded', () => {
     // that has necessarily already fired by this point.
     initRadialCardsSlider();
 
-    // ─── Sticky-video service items: scroll-scrubbed SplitText reveal ───────────────────────
-    // .section.sticky-video's height is set in CSS to one viewport-height per .video-featured-item,
-    // so its scroll distance is the natural pacing source: divide the section's total scroll
-    // range into one equal segment per item and reveal that item's SplitText lines during its
-    // segment. scrub links progress directly to scroll position, so it reverses cleanly when
-    // scrolling back up.
+    // ─── Sticky-video service items: scroll-scrubbed SplitText crossfade ────────────────────
+    // Only one .video-featured-item is ever meant to be on screen, centered in the pinned card,
+    // with the next one's SplitText entrance overlapping the current one's exit. Items are
+    // stacked absolutely on top of each other (wrapper height pinned to the tallest item, since
+    // absolute children can't otherwise size their parent) and cross-animated on a single
+    // scroll-scrubbed timeline built off .section.sticky-video's scroll range.
+    //
+    // SplitText's .lines aren't guaranteed to exist synchronously right after .create() — the
+    // split can defer until web fonts are ready — so targets are collected from the onSplit
+    // callback (same convention as global.js) rather than read off the return value directly.
     function initStickyVideoReveal() {
         const section = document.querySelector('.section.sticky-video');
-        const items = section ? Array.from(section.querySelectorAll('.video-featured-item')) : [];
-        if (!section || !items.length) return;
+        const wrapper = section ? section.querySelector('.video-features-wrapper') : null;
+        const items = wrapper ? Array.from(wrapper.querySelectorAll('.video-featured-item')) : [];
+        if (!section || !wrapper || !items.length) return;
 
-        const itemTargets = items.map(item => {
-            const targets = [];
-            item.querySelectorAll('h1, h3').forEach(el => {
-                const split = SplitText.create(el, { type: 'lines', mask: 'lines', autoSplit: true });
-                targets.push(...split.lines);
+        const elementsByItem = items.map(item => Array.from(item.querySelectorAll('h1, h3')));
+        const linesByElement = new Map();
+
+        function stackItems() {
+            const tallest = Math.max(...items.map(item => item.getBoundingClientRect().height));
+            wrapper.style.position = 'relative';
+            wrapper.style.height = tallest + 'px';
+            items.forEach(item => {
+                Object.assign(item.style, { position: 'absolute', top: '0', left: '0', width: '100%' });
             });
-            return targets;
-        });
+        }
 
         const mediaQueries = gsap.matchMedia();
 
         mediaQueries.add('(prefers-reduced-motion: no-preference)', () => {
-            itemTargets.forEach(targets => gsap.set(targets, { yPercent: 110 }));
+            let scrollTl = null;
+            let pendingSplits = elementsByItem.reduce((sum, els) => sum + els.length, 0);
 
-            const tl = gsap.timeline({
-                scrollTrigger: {
-                    trigger: section,
-                    start: 'top top',
-                    end: 'bottom bottom',
-                    scrub: true,
-                },
+            // Crossfade width, as a fraction of one item's scroll slot — how much of the
+            // outgoing/incoming items' slots overlap while they cross-animate at the boundary.
+            const overlap = 0.4;
+
+            function rebuildTimeline() {
+                if (scrollTl) {
+                    scrollTl.scrollTrigger.kill();
+                    scrollTl.kill();
+                    scrollTl = null;
+                }
+
+                stackItems();
+
+                const itemTargets = elementsByItem.map(els => els.flatMap(el => linesByElement.get(el) || []));
+
+                itemTargets.forEach((targets, index) => {
+                    gsap.set(targets, { yPercent: index === 0 ? 0 : 110 });
+                });
+
+                const tl = gsap.timeline({
+                    scrollTrigger: {
+                        trigger: section,
+                        start: 'top top',
+                        end: 'bottom bottom',
+                        scrub: true,
+                    },
+                });
+
+                itemTargets.forEach((targets, index) => {
+                    if (!targets.length) return;
+
+                    // Exit: slides up and out, centered on the boundary with the next item.
+                    if (index < itemTargets.length - 1) {
+                        tl.to(targets, { yPercent: -110, stagger: 0.08, ease: 'expo.in', duration: overlap }, index + 1 - overlap / 2);
+                    }
+
+                    // Entrance: mirrors the previous item's exit above, at the same boundary.
+                    if (index > 0) {
+                        tl.fromTo(targets, { yPercent: 110 }, { yPercent: 0, stagger: 0.08, ease: 'expo.out', duration: overlap }, index - overlap / 2);
+                    }
+                });
+
+                scrollTl = tl;
+                ScrollTrigger.refresh();
+            }
+
+            elementsByItem.forEach(els => {
+                els.forEach(el => {
+                    SplitText.create(el, {
+                        type: 'lines',
+                        mask: 'lines',
+                        autoSplit: true,
+                        onSplit(instance) {
+                            linesByElement.set(el, instance.lines);
+
+                            if (pendingSplits > 0) {
+                                pendingSplits--;
+                                if (pendingSplits === 0) rebuildTimeline();
+                            } else {
+                                // A resplit after the initial build (resize, font swap) — rebuild
+                                // in place so the timeline picks up the current line elements.
+                                rebuildTimeline();
+                            }
+                        },
+                    });
+                });
             });
 
-            itemTargets.forEach((targets, index) => {
-                if (!targets.length) return;
-                // Each .to() is positioned at its own integer slot on the timeline (0, 1, 2…)
-                // with duration 1, so the scrubbed timeline splits evenly into itemTargets.length
-                // segments — segment `index` spans scroll progress [index/N, (index+1)/N].
-                tl.to(targets, { yPercent: 0, stagger: 0.08, ease: 'expo.out', duration: 1 }, index);
-            });
-
-            return () => tl.scrollTrigger.kill();
+            return () => {
+                if (scrollTl) {
+                    scrollTl.scrollTrigger.kill();
+                    scrollTl.kill();
+                }
+            };
         });
 
         mediaQueries.add('(prefers-reduced-motion: reduce)', () => {
-            itemTargets.forEach(targets => gsap.set(targets, { yPercent: 0 }));
+            stackItems();
+
+            elementsByItem.forEach((els, index) => {
+                els.forEach(el => {
+                    SplitText.create(el, {
+                        type: 'lines',
+                        mask: 'lines',
+                        autoSplit: true,
+                        onSplit(instance) {
+                            gsap.set(instance.lines, { yPercent: index === 0 ? 0 : -110 });
+                        },
+                    });
+                });
+            });
         });
     }
 
