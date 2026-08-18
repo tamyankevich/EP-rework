@@ -653,63 +653,272 @@ document.addEventListener('DOMContentLoaded', function () {
     initStickyStepsBasic();
 });
 
-function initHeroVideoObjectPosition() {
-    const heroVideo = document.getElementById('hero-video');
-    const video = heroVideo && heroVideo.querySelector('.w-background-video video');
-
-    if (!video) return;
-
-    // Base value used at every breakpoint unless overridden below.
-    const defaultSettings = {
-        objectPosition: '50% 50%',
-    };
-
-    // Webflow's standard breakpoints, smallest to largest — only list the values that need to
-    // differ from defaultSettings.
-    const breakpoints = [
-        { maxWidth: 479, overrides: {} },
-        { maxWidth: 767, overrides: {} },
-        { maxWidth: 991, overrides: {
-            objectPosition: '20% 50%',
-        } },
-        { maxWidth: Infinity, overrides: {} },
-    ];
-
-    // Cascade desktop → mobile (matches Webflow's own breakpoint cascade): each breakpoint's
-    // overrides layer on top of the next-larger breakpoint's resolved settings, so a change made
-    // at a larger breakpoint carries down to smaller ones until a smaller breakpoint overrides it itself.
-    (function resolveCascade() {
-        let resolved = defaultSettings;
-        for (let i = breakpoints.length - 1; i >= 0; i--) {
-            resolved = Object.assign({}, resolved, breakpoints[i].overrides);
-            breakpoints[i].resolved = resolved;
-        }
-    })();
-
-    function getSettings() {
-        const windowWidth = window.innerWidth;
-        for (let i = 0; i < breakpoints.length; i++) {
-            if (windowWidth <= breakpoints[i].maxWidth) return breakpoints[i].resolved;
-        }
-        return breakpoints[breakpoints.length - 1].resolved;
+// Walks up from an element to find the nearest actual background color — most wrapper divs
+// are transparent, so reads on the element itself typically fall straight through to whichever
+// ancestor (usually the section) carries the real color.
+function resolveBackgroundColor(el) {
+    for (let node = el; node; node = node.parentElement) {
+        const match = getComputedStyle(node).backgroundColor.match(/rgba?\(([^)]+)\)/);
+        if (!match) continue;
+        const [r, g, b, a = 1] = match[1].split(',').map(v => parseFloat(v));
+        if (a > 0) return [r / 255, g / 255, b / 255];
     }
-
-    function applySettings() {
-        video.style.objectPosition = getSettings().objectPosition;
-    }
-
-    applySettings();
-
-    let resizeTimer;
-    window.addEventListener('resize', () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(applySettings, 150);
-    });
+    return [1, 1, 1];
 }
 
-// Initialize Hero Video Object Position
+// ─── Hero background: WebGL contour field (replaces the hero video) ──────
+// Fine iso-contour lines through a domain-warped simplex noise field, drawn with
+// screen-space antialiasing so they stay hairline-thin at any zoom. Settings tuned
+// in prototypes/contour-field.html.
+function initHeroContourBackground() {
+    const heroVideo = document.getElementById('hero-video');
+    const video = heroVideo && heroVideo.querySelector('.w-background-video video');
+    const heading = document.querySelector('.section.hero h1');
+
+    if (!heroVideo) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.style.position = 'absolute';
+    canvas.style.inset = '0';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    // Reinforces compositor-layer promotion so the browser treats this as an independent,
+    // cheaply-recomposited layer rather than repainting it alongside scroll-driven layout.
+    canvas.style.willChange = 'transform';
+    // The canvas's box can't affect anything outside heroVideo, so scroll doesn't need to
+    // account for it when recalculating layout/paint elsewhere on the page.
+    heroVideo.style.contain = 'layout paint';
+
+    const gl = canvas.getContext('webgl2');
+    if (!gl) return;
+
+    if (video) video.style.display = 'none';
+    heroVideo.appendChild(canvas);
+    if (heading) heading.style.color = '#640400';
+
+    const vertSrc = `#version 300 es
+        in vec2 aPos;
+        void main() {
+            gl_Position = vec4(aPos, 0.0, 1.0);
+        }
+    `;
+
+    // 2D simplex noise (Ashima Arts / webgl-noise, MIT).
+    const noiseGLSL = `
+        vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
+        vec2 mod289(vec2 x){return x-floor(x*(1.0/289.0))*289.0;}
+        vec3 permute(vec3 x){return mod289(((x*34.0)+1.0)*x);}
+
+        float snoise(vec2 v){
+            const vec4 C = vec4(0.211324865405187, 0.366025403784439,
+                                -0.577350269189626, 0.024390243902439);
+            vec2 i  = floor(v + dot(v, C.yy));
+            vec2 x0 = v -   i + dot(i, C.xx);
+            vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+            vec4 x12 = x0.xyxy + C.xxzz;
+            x12.xy -= i1;
+            i = mod289(i);
+            vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0))
+                    + i.x + vec3(0.0, i1.x, 1.0));
+            vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+            m = m*m;
+            m = m*m;
+            vec3 x = 2.0 * fract(p * C.www) - 1.0;
+            vec3 h = abs(x) - 0.5;
+            vec3 ox = floor(x + 0.5);
+            vec3 a0 = x - ox;
+            m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+            vec3 g;
+            g.x  = a0.x  * x0.x  + h.x  * x0.y;
+            g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+            return 130.0 * dot(m, g);
+        }
+
+        // Fixed loop bound (portable across GPUs) with a per-octave gate so octave counts
+        // can be fractional/smoothly tuned rather than jumping in whole steps.
+        #define MAX_OCTAVES 6
+        float fbmN(vec2 p, float octaves, float persistence, float lacunarity) {
+            float sum = 0.0;
+            float amp = 0.5;
+            for (int i = 0; i < MAX_OCTAVES; i++) {
+                float gate = clamp(octaves - float(i), 0.0, 1.0);
+                sum += amp * snoise(p) * gate;
+                p *= lacunarity;
+                amp *= persistence;
+            }
+            return sum;
+        }
+    `;
+
+    const fragSrc = `#version 300 es
+        precision highp float;
+        uniform vec2 uResolution;
+        uniform float uTime;
+        uniform float uDensity;
+        uniform float uLineWidth;
+        uniform float uOpacity;
+        uniform float uWarp;
+        uniform float uScale;
+        uniform float uOctaves;
+        uniform float uWarpOctaves;
+        uniform float uPersistence;
+        uniform float uLacunarity;
+        uniform float uOrbitRadius;
+        uniform float uOrbitSpeed;
+        uniform vec3 uCream;
+        uniform vec3 uLineColor;
+        out vec4 fragColor;
+
+        ${noiseGLSL}
+
+        void main() {
+            vec2 uv = gl_FragCoord.xy / uResolution.xy;
+            vec2 p = (uv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0) * uScale * 3.0;
+
+            // Bounded orbital drift (sin/cos) instead of unbounded linear drift: the warp
+            // seeds slowly circle in place, so the field keeps reconfiguring without ever
+            // presenting a consistent slide direction (which is what triggers vection).
+            float t = uTime * uOrbitSpeed;
+            vec2 warp = vec2(
+                fbmN(p + vec2(11.3 + sin(t * 0.7) * uOrbitRadius, 4.1 + cos(t * 0.5) * uOrbitRadius), uWarpOctaves, uPersistence, uLacunarity),
+                fbmN(p + vec2(-7.7 + cos(t * 0.6) * uOrbitRadius, 2.9 + sin(t * 0.9) * uOrbitRadius), uWarpOctaves, uPersistence, uLacunarity)
+            );
+
+            float h = fbmN(p + warp * uWarp, uOctaves, uPersistence, uLacunarity);
+
+            float v = h * uDensity;
+            float g = abs(v - floor(v + 0.5));
+            float aa = fwidth(v) * uLineWidth;
+            float line = 1.0 - smoothstep(0.0, aa, g);
+
+            vec3 col = mix(uCream, uLineColor, line * uOpacity);
+            fragColor = vec4(col, 1.0);
+        }
+    `;
+
+    function compile(type, src) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, src);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(shader));
+        }
+        return shader;
+    }
+
+    const program = gl.createProgram();
+    gl.attachShader(program, compile(gl.VERTEX_SHADER, vertSrc));
+    gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragSrc));
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error(gl.getProgramInfoLog(program));
+    }
+    gl.useProgram(program);
+
+    const quad = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+    const aPos = gl.getAttribLocation(program, 'aPos');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+    const u = {
+        resolution: gl.getUniformLocation(program, 'uResolution'),
+        time: gl.getUniformLocation(program, 'uTime'),
+        density: gl.getUniformLocation(program, 'uDensity'),
+        lineWidth: gl.getUniformLocation(program, 'uLineWidth'),
+        opacity: gl.getUniformLocation(program, 'uOpacity'),
+        warp: gl.getUniformLocation(program, 'uWarp'),
+        scale: gl.getUniformLocation(program, 'uScale'),
+        octaves: gl.getUniformLocation(program, 'uOctaves'),
+        warpOctaves: gl.getUniformLocation(program, 'uWarpOctaves'),
+        persistence: gl.getUniformLocation(program, 'uPersistence'),
+        lacunarity: gl.getUniformLocation(program, 'uLacunarity'),
+        orbitRadius: gl.getUniformLocation(program, 'uOrbitRadius'),
+        orbitSpeed: gl.getUniformLocation(program, 'uOrbitSpeed'),
+        cream: gl.getUniformLocation(program, 'uCream'),
+        lineColor: gl.getUniformLocation(program, 'uLineColor'),
+    };
+
+    // Tuned in prototypes/contour-field.html — copy settings button.
+    const settings = {
+        density: 7,
+        lineWidth: 0.6,
+        opacity: 0.28,
+        warp: 1.1,
+        scale: 1.4,
+        speed: 0.04,
+        octaves: 2,
+        warpOctaves: 1,
+        persistence: 0.52,
+        lacunarity: 2.02,
+        orbitRadius: 2,
+        orbitSpeed: 1,
+        lineColor: [100 / 255, 4 / 255, 0 / 255],
+    };
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const speed = prefersReducedMotion ? 0 : settings.speed;
+
+    gl.uniform1f(u.density, settings.density);
+    gl.uniform1f(u.lineWidth, settings.lineWidth);
+    gl.uniform1f(u.opacity, settings.opacity);
+    gl.uniform1f(u.warp, settings.warp);
+    gl.uniform1f(u.scale, settings.scale);
+    gl.uniform1f(u.octaves, settings.octaves);
+    gl.uniform1f(u.warpOctaves, settings.warpOctaves);
+    gl.uniform1f(u.persistence, settings.persistence);
+    gl.uniform1f(u.lacunarity, settings.lacunarity);
+    gl.uniform1f(u.orbitRadius, settings.orbitRadius);
+    gl.uniform1f(u.orbitSpeed, settings.orbitSpeed);
+    const cream = resolveBackgroundColor(heroVideo);
+    gl.uniform3f(u.cream, cream[0], cream[1], cream[2]);
+    gl.uniform3f(u.lineColor, settings.lineColor[0], settings.lineColor[1], settings.lineColor[2]);
+
+    function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 3);
+        canvas.width = Math.floor(heroVideo.offsetWidth * dpr);
+        canvas.height = Math.floor(heroVideo.offsetHeight * dpr);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.uniform2f(u.resolution, canvas.width, canvas.height);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Stops the draw loop once the hero scrolls out of view instead of rendering forever
+    // for the rest of the page — the shader itself is cheap, but no reason to keep the
+    // GPU busy on a full-screen effect nobody can see.
+    let isVisible = true;
+    const visibilityObserver = new IntersectionObserver((entries) => {
+        isVisible = entries[0].isIntersecting;
+        if (isVisible) requestAnimationFrame(frame);
+    }, { threshold: 0 });
+    visibilityObserver.observe(heroVideo);
+
+    // Redrawing every display frame competes with the browser's own scroll compositing on
+    // the main thread — barely noticeable at 60Hz, but on 120Hz (ProMotion) Macs the frame
+    // budget is half as long, so any inconsistency reads as scroll stutter. This is a slow
+    // ambient drift, not something that needs to match display refresh — capping the redraw
+    // rate frees up most of that contested budget without any visible loss of smoothness.
+    const frameInterval = 1000 / 30;
+    let lastDrawTime = 0;
+
+    const start = performance.now();
+    function frame(now) {
+        if (!isVisible) return;
+        requestAnimationFrame(frame);
+        if (now - lastDrawTime < frameInterval) return;
+        lastDrawTime = now;
+        gl.uniform1f(u.time, (now - start) / 1000 * speed);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+    requestAnimationFrame(frame);
+}
+
+// Initialize Hero Contour Background
 document.addEventListener('DOMContentLoaded', () => {
-    initHeroVideoObjectPosition();
+    initHeroContourBackground();
 });
 
 const hoverSound = new Audio(
