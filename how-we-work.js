@@ -1,7 +1,9 @@
 console.log('how-we-work.js loaded');
 
+gsap.registerPlugin(SplitText, ScrollTrigger);
+
 document.addEventListener('DOMContentLoaded', () => {
-    
+
     gsap.registerPlugin(Draggable, InertiaPlugin, CustomEase);
     CustomEase.create("radial", "0.25, 0.1, 0, 1");
     
@@ -398,5 +400,57 @@ document.addEventListener('DOMContentLoaded', () => {
     // so this just calls it directly rather than registering a second listener for an event
     // that has necessarily already fired by this point.
     initRadialCardsSlider();
+
+    // ─── Sticky-video service items: scroll-scrubbed SplitText reveal ───────────────────────
+    // .section.sticky-video's height is set in CSS to one viewport-height per .video-featured-item,
+    // so its scroll distance is the natural pacing source: divide the section's total scroll
+    // range into one equal segment per item and reveal that item's SplitText lines during its
+    // segment. scrub links progress directly to scroll position, so it reverses cleanly when
+    // scrolling back up.
+    function initStickyVideoReveal() {
+        const section = document.querySelector('.section.sticky-video');
+        const items = section ? Array.from(section.querySelectorAll('.video-featured-item')) : [];
+        if (!section || !items.length) return;
+
+        const itemTargets = items.map(item => {
+            const targets = [];
+            item.querySelectorAll('h1, h3').forEach(el => {
+                const split = SplitText.create(el, { type: 'lines', mask: 'lines', autoSplit: true });
+                targets.push(...split.lines);
+            });
+            return targets;
+        });
+
+        const mediaQueries = gsap.matchMedia();
+
+        mediaQueries.add('(prefers-reduced-motion: no-preference)', () => {
+            itemTargets.forEach(targets => gsap.set(targets, { yPercent: 110 }));
+
+            const tl = gsap.timeline({
+                scrollTrigger: {
+                    trigger: section,
+                    start: 'top top',
+                    end: 'bottom bottom',
+                    scrub: true,
+                },
+            });
+
+            itemTargets.forEach((targets, index) => {
+                if (!targets.length) return;
+                // Each .to() is positioned at its own integer slot on the timeline (0, 1, 2…)
+                // with duration 1, so the scrubbed timeline splits evenly into itemTargets.length
+                // segments — segment `index` spans scroll progress [index/N, (index+1)/N].
+                tl.to(targets, { yPercent: 0, stagger: 0.08, ease: 'expo.out', duration: 1 }, index);
+            });
+
+            return () => tl.scrollTrigger.kill();
+        });
+
+        mediaQueries.add('(prefers-reduced-motion: reduce)', () => {
+            itemTargets.forEach(targets => gsap.set(targets, { yPercent: 0 }));
+        });
+    }
+
+    initStickyVideoReveal();
 
 });
