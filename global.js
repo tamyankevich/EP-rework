@@ -155,6 +155,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!navWrapper || !navFull || !navMenuWrapper || !navButton) return;
 
+        // Locks page scroll while the nav is open. overflow:hidden on <html> alone leaves a
+        // horizontal shift as the scrollbar disappears — the padding-right compensation keeps
+        // layout width stable. Scroll position itself is preserved by the browser across the
+        // lock/unlock (overflow:hidden doesn't reset scrollTop), so closing lands back where
+        // the user left off.
+        const root = document.documentElement;
+
+        function lockScroll() {
+            const scrollbarWidth = window.innerWidth - root.clientWidth;
+            root.style.overflow = 'hidden';
+            if (scrollbarWidth > 0) root.style.paddingRight = scrollbarWidth + 'px';
+        }
+
+        function unlockScroll() {
+            root.style.overflow = '';
+            root.style.paddingRight = '';
+        }
+
         // .nav-full's natural collapsed height, captured before it's ever animated (nav-menu-wrapper
         // is still height:0 at this point) — used as the close timeline's target so closing doesn't
         // depend on tl.reverse()'s recorded start value.
@@ -181,6 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // scroll-triggered transparent nav) can react without global.js knowing about them.
         openTl.eventCallback('onStart', () => {
             navWrapper.classList.add('is-open');
+            lockScroll();
             document.dispatchEvent(new CustomEvent('nav:open'));
         });
 
@@ -247,6 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
             navWrapper.classList.remove('is-open');
             navFull.classList.remove('is-open');
             navMenuWrapper.classList.remove('is-open');
+            unlockScroll();
         });
 
         let isOpen = false;
