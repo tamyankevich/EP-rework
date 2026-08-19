@@ -195,8 +195,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Lock scroll / apply open styles to the outer wrapper immediately on open.
-        // Also broadcasts nav:open/nav:close so page-specific scripts (e.g. home.js's
-        // scroll-triggered transparent nav) can react without global.js knowing about them.
+        // Also broadcasts nav:open/nav:close so page-specific scripts can react without
+        // global.js knowing about them.
         openTl.eventCallback('onStart', () => {
             navWrapper.classList.add('is-open');
             lockScroll();
