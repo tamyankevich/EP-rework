@@ -149,11 +149,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function navbarAnimation() {
         const navWrapper = document.getElementById('nav-wrapper');
         const navFull = document.querySelector('.nav-full');
+        const navBar = document.getElementById('nav-bar');
         const navMenuWrapper = document.querySelector('.nav-menu-wrapper');
         const navButton = document.getElementById('nav-button');
         const navDecorationFiller = document.querySelector('.nav-decoration-filler');
 
-        if (!navWrapper || !navFull || !navMenuWrapper || !navButton) return;
+        if (!navWrapper || !navFull || !navBar || !navMenuWrapper || !navButton) return;
 
         // Locks page scroll while the nav is open. overflow:hidden on <html> alone leaves a
         // horizontal shift as the scrollbar disappears — the padding-right compensation keeps
@@ -172,11 +173,6 @@ document.addEventListener('DOMContentLoaded', () => {
             root.style.overflow = '';
             root.style.paddingRight = '';
         }
-
-        // .nav-full's natural collapsed height, captured before it's ever animated (nav-menu-wrapper
-        // is still height:0 at this point) — used as the close timeline's target so closing doesn't
-        // depend on tl.reverse()'s recorded start value.
-        const navFullClosedHeight = navFull.getBoundingClientRect().height;
 
         gsap.set(navMenuWrapper, { opacity: 0 });
         // height, not scaleY: a transform would stretch the element the client nested inside
@@ -253,7 +249,14 @@ document.addEventListener('DOMContentLoaded', () => {
             document.dispatchEvent(new CustomEvent('nav:close'));
         });
 
-        closeTl.to(navFull, { height: navFullClosedHeight });
+        // #nav-bar's own height doesn't change between the open/closed states (it's a sibling of
+        // .nav-menu-wrapper in a column flex layout, sized by its own content, not stretched) —
+        // so it's a reliable stand-in for .nav-full's closed height. Measured live here instead
+        // of cached once at load, since a cached value goes stale across a font swap-in or a
+        // resize past #nav-bar's responsive min-height breakpoints, which was landing the close
+        // tween on the wrong pixel value and producing a visible snap once .is-open (which
+        // governs the real final layout via CSS) gets stripped on completion.
+        closeTl.to(navFull, { height: () => navBar.getBoundingClientRect().height });
         if (navDecorationFiller) closeTl.to(navDecorationFiller, { height: 0 }, '<');
         if (allLines.length) closeTl.to(allLines, { scaleX: 0 }, '<');
         if (allChars.length) closeTl.to(allChars, { yPercent: 110 }, '<');
