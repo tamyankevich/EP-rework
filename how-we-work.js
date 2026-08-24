@@ -413,8 +413,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // onSplit callback (same convention as global.js) rather than read off the return value
     // directly.
     //
-    // The heading (service name) splits by character, the description splits by word — each
-    // gets its own stagger pace, matching the split-type convention in global.js's splitConfig.
+    // Both the heading (service name) and description split by word — a char split on the
+    // heading was wrapping badly, so both use the same split type here.
     function initStickyVideoReveal() {
         const section = document.querySelector('.section.sticky-video');
         const wrapper = section ? section.querySelector('.video-features-wrapper') : null;
@@ -425,7 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const heading = item.querySelector('h1');
             const description = item.querySelector('h3');
             const specs = [];
-            if (heading) specs.push({ el: heading, type: 'chars', stagger: 0.015 });
+            if (heading) specs.push({ el: heading, type: 'words', stagger: 0.06 });
             if (description) specs.push({ el: description, type: 'words', stagger: 0.06 });
             return specs;
         });
