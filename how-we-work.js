@@ -928,7 +928,7 @@ function debounceOnWidthChange(fn, ms) {
 // doesn't double-bind the original (non-cloned) cards.
 const bioEase = 'cubic-bezier(0.625, 0.05, 0, 1)';
 const bioDuration = 0.36;
-const bioWordStagger = 0.03;
+const bioLineStagger = 0.06;
 
 function revertCollectiveCardSplits() {
   document.querySelectorAll('.collective-card').forEach(card => {
@@ -954,16 +954,16 @@ function initCollectiveCardBios() {
     card.setAttribute('data-bio-status', 'closed');
 
     let isOpen = false;
-    let words = [];
+    let lines = [];
 
     if (paragraph) {
       card._bioSplit = SplitText.create(paragraph, {
-        type: 'words',
-        mask: 'words',
+        type: 'lines',
+        mask: 'lines',
         autoSplit: true,
         onSplit(instance) {
-          words = instance.words;
-          gsap.set(words, { yPercent: 110, opacity: 0 });
+          lines = instance.lines;
+          gsap.set(lines, { yPercent: 110, opacity: 0 });
         }
       });
     }
@@ -971,7 +971,7 @@ function initCollectiveCardBios() {
     const handler = () => {
       isOpen = !isOpen;
 
-      gsap.killTweensOf([bioWrapper, ...words]);
+      gsap.killTweensOf([bioWrapper, ...lines]);
 
       const tl = gsap.timeline();
 
@@ -981,11 +981,11 @@ function initCollectiveCardBios() {
         ease: bioEase
       }, 0);
 
-      if (words.length) {
-        tl.to(words, {
+      if (lines.length) {
+        tl.to(lines, {
           yPercent: isOpen ? 0 : 110,
           opacity: isOpen ? 1 : 0,
-          stagger: bioWordStagger,
+          stagger: bioLineStagger,
           duration: bioDuration,
           ease: bioEase
         }, isOpen ? bioDuration * 0.15 : 0);
