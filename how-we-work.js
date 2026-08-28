@@ -927,8 +927,8 @@ function debounceOnWidthChange(fn, ms) {
 // per-card handler is stored on the card itself so re-running on resize
 // doesn't double-bind the original (non-cloned) cards.
 const bioEase = 'cubic-bezier(0.625, 0.05, 0, 1)';
-const bioDuration = 0.36;
-const bioLineStagger = 0.06;
+const bioDuration = 0.25;
+const bioLineStagger = 0.042;
 
 function revertCollectiveCardSplits() {
   document.querySelectorAll('.collective-card').forEach(card => {
