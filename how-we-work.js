@@ -562,6 +562,11 @@ function initSpatialCardsSlider() {
   const slideDuration = 1;
   const clickEase = 'spatial';
 
+  // Original (non-cloned) cards persist across re-inits, so their bio
+  // paragraph SplitText instance must be reverted to plain text before
+  // re-cloning below — otherwise clones would inherit already-split markup.
+  revertCollectiveCardSplits();
+
   document.querySelectorAll('[data-spatial-slider-init]').forEach(container => {
     if (container._spatialSliderDraggable) container._spatialSliderDraggable.kill();
     if (container._spatialSliderImageObserver) container._spatialSliderImageObserver.disconnect();
@@ -923,29 +928,68 @@ function debounceOnWidthChange(fn, ms) {
 // doesn't double-bind the original (non-cloned) cards.
 const bioEase = 'cubic-bezier(0.625, 0.05, 0, 1)';
 const bioDuration = 0.36;
+const bioWordStagger = 0.03;
+
+function revertCollectiveCardSplits() {
+  document.querySelectorAll('.collective-card').forEach(card => {
+    if (card._bioSplit) {
+      card._bioSplit.revert();
+      card._bioSplit = null;
+    }
+  });
+}
 
 function initCollectiveCardBios() {
   document.querySelectorAll('.collective-card').forEach(card => {
     const button = card.querySelector('.read-more-button');
     const bioWrapper = card.querySelector('.bio-text-wrapper');
+    const paragraph = bioWrapper ? bioWrapper.querySelector('p') : null;
     if (!button || !bioWrapper) return;
 
     if (card._bioToggleHandler) button.removeEventListener('click', card._bioToggleHandler);
+    if (card._bioSplit) card._bioSplit.revert();
 
     gsap.set(bioWrapper, { height: 0, overflow: 'hidden' });
     button.setAttribute('aria-expanded', 'false');
     card.setAttribute('data-bio-status', 'closed');
 
     let isOpen = false;
+    let words = [];
+
+    if (paragraph) {
+      card._bioSplit = SplitText.create(paragraph, {
+        type: 'words',
+        mask: 'words',
+        autoSplit: true,
+        onSplit(instance) {
+          words = instance.words;
+          gsap.set(words, { yPercent: 110, opacity: 0 });
+        }
+      });
+    }
 
     const handler = () => {
       isOpen = !isOpen;
 
-      gsap.to(bioWrapper, {
+      gsap.killTweensOf([bioWrapper, ...words]);
+
+      const tl = gsap.timeline();
+
+      tl.to(bioWrapper, {
         height: isOpen ? '100%' : 0,
         duration: bioDuration,
         ease: bioEase
-      });
+      }, 0);
+
+      if (words.length) {
+        tl.to(words, {
+          yPercent: isOpen ? 0 : 110,
+          opacity: isOpen ? 1 : 0,
+          stagger: bioWordStagger,
+          duration: bioDuration,
+          ease: bioEase
+        }, isOpen ? bioDuration * 0.15 : 0);
+      }
 
       button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
       card.setAttribute('data-bio-status', isOpen ? 'open' : 'closed');
