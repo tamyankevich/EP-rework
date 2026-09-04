@@ -1,0 +1,68 @@
+---
+title: Overview
+description: How to keep the Event People website accurate and up to date, and how to hand off ongoing development.
+---
+
+<Note>
+  This guide covers *in-house content maintenance* in Webflow. For design changes, new sections, new CMS fields, or anything relating to custom code, treat those as development work, not routine content edits.
+</Note>
+
+This documentation explains how to keep the [Event People website](https://www.eventpeople.us) accurate and up to date, and how to pick up ongoing development if that ever moves in-house or to another team.
+
+You will learn:
+
+- What you can safely update on your own.
+- Which tools are connected to the site, and what each one does.
+- How to edit **static pages** (regular page content).
+- How to edit **dynamic content** in the Webflow **CMS** (Collective members, Destinations).
+- Where to find and export **form submissions**.
+- Where custom code lives, what it does, and how to host it yourself.
+
+## Who this is for
+
+<CardGroup cols={2}>
+  <Card title="Content editors" icon="pencil">
+    The [Static Pages](/content-editing/static-pages), [CMS Collections](/content-editing/cms-collections), and [Forms](/content-editing/forms) pages. No Designer access or code knowledge required.
+  </Card>
+  <Card title="Future developer" icon="code">
+    The [Custom Code Overview](/custom-code/overview) and [Hosting](/custom-code/hosting) pages. Assumes comfort with Webflow's Designer, basic JS, and static asset hosting.
+  </Card>
+  <Card title="Department / internal team" icon="building">
+    Same technical depth as the future-developer pages — use them to evaluate what a dev handoff actually involves.
+  </Card>
+  <Card title="Getting access" icon="key" href="/getting-started">
+    Accounts and permissions you'll need before you can do any of the above.
+  </Card>
+</CardGroup>
+
+## What "in-house maintenance" includes
+
+<Columns cols={2}>
+<Card title="You can safely do" icon="circle-check">
+- Edit text, images, and links on existing pages, directly in Webflow's **content editing mode** (the marketer/content-editor role).
+- Create, edit, and publish CMS items in **Collective members** and **Destinations**.
+- Swap featured collaborators on a Destination, reorder items, update bios and photos.
+- Review and export contact form and newsletter submissions.
+- Update redirects when a page slug changes (with care).
+</Card>
+<Card title="Please do not do without support" icon="circle-exclamation">
+- Change layout structure (new sections, grids, complex interactions).
+- Edit content inside interactive/animated sections (see below) — they can desync from the custom code driving them.
+- Change global styles, typography scales, or design tokens.
+- Edit or remove **custom code**.
+- Add new CMS fields, new CMS collections, or new templates.
+- Install new third-party scripts.
+</Card>
+</Columns>
+
+### Interactive sections that need extra care
+
+These are not reliably editable from content editing mode, since the custom code described in [Custom Code Overview](/custom-code/overview) drives them:
+
+- Nav menu (open/close animation)
+- Home: cascading image slider, 3D card "tornado", sticky steps
+- About: pinned visuals / step timeline, interactive image collage
+- Destinations: sticky scroll-reveal service cards
+- The Collective: spatial member-card slider, bio "read more" toggle
+
+If you are not sure which bucket an edit falls into, pause and ask.

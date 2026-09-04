@@ -1,0 +1,45 @@
+---
+title: Static Pages
+description: How to update regular page content in Webflow's content editing mode.
+---
+
+Static pages are regular pages where the content is edited directly on the page (not pulled from a CMS collection).
+
+## Event People static pages
+
+- **Home**
+- **About**
+- **The collective** — intro/framing copy only; member cards themselves come from the [Collective members](/content-editing/cms-collections#collective-members-collection) CMS collection.
+- **Destinations** — intro/framing copy only; destination cards themselves come from the [Destinations](/content-editing/cms-collections#destinations-collection) CMS collection.
+- **Contact us**
+- **Coming soon** — currently unpublished/draft holding page.
+
+## How to update a static page
+
+<Steps>
+  <Step title="Open content editing mode">
+    Dashboard → **Open in Webflow**, or add `?update` to the live URL.
+  </Step>
+  <Step title="Navigate to the page">
+    Hover over the element you want to change — when something is editable, you'll see a **blue outline**.
+  </Step>
+  <Step title="Click Edit">
+    - Text: pencil icon (format selected text — bold, italic — with the formatting menu).
+    - Links: link icon.
+    - Images: asset/image icon.
+    - Image settings: gear icon.
+  </Step>
+  <Step title="Make your edit">
+    Changes are **saved automatically**.
+  </Step>
+  <Step title="Publish">
+    Use the **Publish** button in the upper-right corner. Test on the staging domain (`webflow.io`) first, or publish directly to production.
+  </Step>
+</Steps>
+
+## Before you publish, double-check
+
+- Links work (especially buttons and navigation).
+- Spelling and capitalization.
+- Mobile view looks acceptable — flag anything that looks "off" before publishing.
+- The interactive/animated sections listed on the [Overview](/) page look untouched.

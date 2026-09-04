@@ -1,0 +1,66 @@
+---
+title: Getting Started
+description: Tools connected to the site, required access, and Webflow's two editing modes.
+---
+
+## Tools connected to the website
+
+The site is built and hosted on **Webflow**.
+
+<CardGroup cols={2}>
+  <Card title="Webflow" icon="webflow">
+    The website builder, CMS, form storage, and hosting platform. Where you edit pages and CMS content, and publish updates.
+  </Card>
+  <Card title="GitHub" icon="github" href="https://github.com/tamyankevich/EP-rework">
+    Source of truth for the four custom-code JavaScript files — see [Custom Code Overview](/custom-code/overview). Not connected to Webflow directly today.
+  </Card>
+  <Card title="Bunny.net (recommended CDN)" icon="cloud">
+    Recommended host for the custom-code files (and any large media) if you take over hosting. You'll only touch this when updating a file version or setting up hosting for the first time.
+  </Card>
+  <Card title="Cloudflare (alternative CDN)" icon="cloudflare">
+    A solid alternative to Bunny — Cloudflare Pages for static files, or R2 + a Worker/CDN in front of it. Slightly more setup, useful if you already standardize on Cloudflare.
+  </Card>
+</CardGroup>
+
+<Tip>
+  If additional tools get connected later (email marketing, scheduling, analytics), add them here with links and owner credentials once confirmed.
+</Tip>
+
+## Getting access (accounts + permissions)
+
+To maintain the site, you will need access to:
+
+- **Webflow Workspace** — Editor/content-editor access is usually enough for content work; Designer access is more powerful and needed for anything under "Please do not do without support" on the [Overview](/) page.
+- **The custom-code GitHub repo** — only needed for development work. Ask for it to be transferred or for collaborator access.
+- **Bunny.net or Cloudflare** — only if you're setting up or maintaining self-hosted custom code.
+
+<Warning>
+  **Best practice:** use individual logins when possible. Avoid sharing a single password across a team.
+</Warning>
+
+## Accessing Webflow: Content editing mode vs. Designer
+
+Webflow's old standalone "Editor" experience has been replaced by a **content editing mode** that runs in a simplified interface, so you can update content without touching design.
+
+### Content editing mode (recommended for routine updates)
+
+Use content editing mode when you are updating page copy, links, and images; CMS items (Collective members, Destinations); or certain page settings (SEO title/meta description, Open Graph images).
+
+<Steps>
+  <Step title="Open content editing mode">
+    Two ways in:
+    - From the **Webflow Dashboard** → hover over the site → **Open in Webflow** → in the upper-left corner, select Preview role: **Content editor**.
+    - From the live site, add `?update` to the end of any page URL (example: `https://www.eventpeople.us/about?update`).
+  </Step>
+  <Step title="Edit">
+    Changes you make are **automatically saved**. If multiple people edit the same content at the same time, the last edits win.
+  </Step>
+</Steps>
+
+### Webflow Designer (use with caution)
+
+Use the Designer when you are adjusting CMS templates and collection pages; updating collection structure and settings (fields, validations, etc.); working with components, symbols, styles, and interactions; managing redirects; or touching any custom code.
+
+<Warning>
+  If you are not comfortable in the Designer, stick to content editing mode and request support for Designer-level changes.
+</Warning>

@@ -1,0 +1,113 @@
+---
+title: CMS Collections
+description: Field reference and editing workflow for the Collective members and Destinations collections.
+---
+
+Dynamic content comes from the Webflow **CMS**. Event People has two collections — **Collective members** and **Destinations** — and they're linked: a Destination references the Collective members featured on it.
+
+Members with the **content editor** role or higher can create, edit, delete, and import/export CMS items.
+
+## Collective members collection
+
+Slug: `collaborators` · used on **The Collective** page and its detail template.
+
+| Field | Type | Notes |
+|---|---|---|
+| Name * | Plain text | Required. |
+| Slug * | Plain text | Required — auto-generated from Name, but editable. Changing it after publishing breaks any links to that member's page. |
+| Role | Plain text | Job title. |
+| Company | Plain text | |
+| Country | Plain text | |
+| Bio | Plain text | Max 250 characters — this is a card/summary length field, not a full profile. |
+| Photo | Image | |
+
+## Destinations collection
+
+Slug: `destinations` · used on the **Destinations** page and its detail template.
+
+| Field | Type | Notes |
+|---|---|---|
+| Name * | Plain text | Required. |
+| Slug * | Plain text | Required — changing it after publishing breaks existing links. |
+| Hero Image * | Image | Required. |
+| Card Overview | Plain text | Short 2–3 sentence summary shown in the Destinations listing/card view. |
+| Intro Body | Rich text | Body copy under the "Inviting the visitor into the destination" heading. Supports bold, italic, links. |
+| Intro Image | Image | |
+| Intro Image Caption | Plain text | |
+| Secondary Body | Rich text | Destination-specific copy (e.g. "Visitors to Berlin can immerse themselves…"). |
+| About Events Body | Rich text | Body copy under the "About the events previously hosted" heading. |
+| Collaborators | Reference (multi) | Links to one or more **Collective members** — the vendors/collaborators featured for this destination. Select existing members rather than re-entering their info. |
+
+<Warning>
+  **Order matters:** create or confirm a member exists in Collective members before referencing them in a Destination's Collaborators field.
+</Warning>
+
+## Editing CMS items
+
+<Tabs>
+  <Tab title="Option A: CMS panel">
+    <Steps>
+      <Step title="Open content editing mode" />
+      <Step title="Go to the CMS panel" />
+      <Step title="Pick a collection">
+        Collective members or Destinations.
+      </Step>
+      <Step title="Create or select an item">
+        Click **New** to create, or select an existing item.
+      </Step>
+      <Step title="Edit">
+        Changes are automatically saved in **draft** state.
+      </Step>
+      <Step title="Preview or publish">
+        Click the **Eye** icon to preview, or **Publish now** to make the changes live.
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="Option B: On the canvas">
+    <Steps>
+      <Step title="Open content editing mode" />
+      <Step title="Go to the Pages panel" />
+      <Step title="Open the collection template page">
+        **Collective members Template** or **Destinations Template**.
+      </Step>
+      <Step title="Switch items">
+        Use the page-switcher dropdown in the top bar. Use the **Add (+)** icon to create a new item.
+      </Step>
+      <Step title="Edit inline">
+        Hover and click editable elements (blue outline), then use the **Edit** icon.
+      </Step>
+      <Step title="Publish">
+        Use **CMS status** in the top bar for **Slug** and **Publish now**.
+      </Step>
+    </Steps>
+    <Warning>
+      If you change "static" content on a collection template (elements not bound to a CMS field), that change applies to **every** item in that collection.
+    </Warning>
+  </Tab>
+</Tabs>
+
+## Checklist for a new Destination
+
+- Clear, specific Name.
+- Hero Image set (required).
+- Card Overview written — this is what shows in the listing grid, don't leave it blank.
+- Intro Body / Secondary Body / About Events Body filled in as applicable.
+- Relevant Collective members linked under Collaborators.
+- Confirm it appears correctly on the Destinations listing and that the detail page loads as expected.
+
+## AI workflow: Claude ↔ Webflow MCP
+
+Claude can connect directly to this Webflow site (CMS items, pages, forms, custom code) via the Webflow MCP connector.
+
+<Steps>
+  <Step title="Open Claude" />
+  <Step title="Go to Settings → Integrations (or Connectors)" />
+  <Step title="Find Webflow MCP and click Connect" />
+  <Step title="Sign in to the correct Webflow account/workspace and approve access" />
+  <Step title="Confirm Claude shows Webflow as Connected" />
+  <Step title="Test it">
+    Try a prompt like "List my Webflow sites" or "Confirm you can access the Event People Reworked site."
+  </Step>
+</Steps>
+
+Once connected, Claude can bulk-create or update CMS items (e.g. a batch of new Destinations or Collective members) from a structured brief — useful for large content pushes instead of doing them one-by-one in the CMS panel.

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Event People Documentation",
+  "colors": {
+    "primary": "#0D9488",
+    "light": "#5EEAD4",
+    "dark": "#0F766E"
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": ["index", "getting-started"]
+      },
+      {
+        "group": "Content Editing",
+        "pages": [
+          "content-editing/static-pages",
+          "content-editing/cms-collections",
+          "content-editing/forms"
+        ]
+      },
+      {
+        "group": "Custom Code",
+        "pages": ["custom-code/overview", "custom-code/hosting"]
+      },
+      {
+        "group": "Reference",
+        "pages": ["publishing-and-support"]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "website": "https://www.eventpeople.us"
+    }
+  }
+}

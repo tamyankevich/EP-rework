@@ -1,0 +1,66 @@
+---
+title: Hosting the Custom Code
+description: How to host the four JS files on a CDN and wire them into Webflow's Custom Code settings.
+---
+
+## Media and file storage
+
+For most day-to-day content edits, uploading directly through Webflow's native asset picker on an Image field is enough — you don't need Bunny or Cloudflare at all. Only use an external CDN if you're hosting large/optimized media outside Webflow, or hosting the custom-code files below.
+
+<Tabs>
+  <Tab title="Bunny.net (recommended)">
+    <Steps>
+      <Step title="Log in to your Bunny.net account" />
+      <Step title="Go to Storage">
+        Select (or create) the storage zone for this project.
+      </Step>
+      <Step title="Create folders">
+        Keep things organized, e.g. `event-people/custom-code`, `event-people/media`.
+      </Step>
+      <Step title="Upload and copy the URL">
+        Upload your file(s), then **Copy URL** for each — this is the URL you'll paste into a Webflow CMS field, or into a script tag for custom code.
+      </Step>
+    </Steps>
+    <Tip>
+      If using the Webflow MCP in Claude or any other bulk upload method, you can select multiple files and copy their URLs all at once.
+    </Tip>
+  </Tab>
+  <Tab title="Cloudflare (alternative)">
+    - **Cloudflare Pages** (simplest for a handful of static JS files): connect the GitHub repo (or drag-and-drop deploy) and Cloudflare serves every file in it over its CDN at a stable `*.pages.dev` URL (or a custom subdomain like `cdn.eventpeople.us`).
+    - **Cloudflare R2 + a Worker** (more control, works well alongside other Cloudflare infra): upload files to an R2 bucket, then front it with a Worker or Cloudflare's built-in public bucket URL to get a stable HTTPS link per file.
+    - Either way, copy the resulting HTTPS URL for each file the same way you would a Bunny URL.
+  </Tab>
+</Tabs>
+
+## Where each file needs to go in Webflow
+
+Once the files are hosted and you have a stable HTTPS URL for each:
+
+<Steps>
+  <Step title="Load GSAP + plugins first">
+    On every page that uses any custom code — in practice, that's every page because of `global.js`. Add the GSAP script tags in **Project Settings → Custom Code → Footer Code** (site-wide), *above* where `global.js` will be referenced.
+  </Step>
+  <Step title="global.js → site-wide">
+    Also in **Project Settings → Custom Code → Footer Code**, as a script tag, after the GSAP tags. It must run on every page.
+  </Step>
+  <Step title="home.js → Home page">
+    **Home page → Page Settings → Custom Code → Before `</body>`**.
+  </Step>
+  <Step title="about.js → About page">
+    **About page → Page Settings → Custom Code → Before `</body>`**.
+  </Step>
+  <Step title="how-we-work.js → two pages">
+    Applied on **both** the **Destinations** page **and** **The Collective** page → Page Settings → Custom Code → Before `</body>` on each.
+  </Step>
+</Steps>
+
+<Warning>
+  Keep the load order consistent everywhere: GSAP core → GSAP plugins → the relevant project file(s). Loading a project file before its GSAP dependencies is a common cause of "the animation just doesn't run" bugs.
+</Warning>
+
+### Where custom code may be located, generally
+
+- Project Settings → Custom Code (site-wide header/footer snippets).
+- Page Settings → Custom Code (page-specific snippets).
+- Embedded code blocks on a page.
+- External files hosted on Bunny.net or Cloudflare.
